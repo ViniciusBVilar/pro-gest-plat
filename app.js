@@ -1,5 +1,66 @@
-var app = angular.module('sample', ['auth0', 'angular-storage', 'angular-jwt', 'ngRoute', 'sample.home']);
-app.config( function myAppConfig ( $routeProvider, authProvider, $httpProvider, $locationProvider,
+
+var express = require('express');
+var path = require('path');
+var favicon = require('serve-favicon');
+var logger = require('morgan');
+var cookieParser = require('cookie-parser');
+var bodyParser = require('body-parser');
+var dotenv = require('dotenv');
+var jwt = require('express-jwt');
+var cors = require('cors');
+var http = require('http');
+
+
+var routes = require('./routes/index');
+var users = require('./routes/users');
+
+var app = express();
+var router = express.Router();
+
+dotenv.load();
+
+var authenticate = jwt({
+  secret: new Buffer(process.env.AUTH0_CLIENT_SECRET, 'base64'),
+  audience: process.env.AUTH0_CLIENT_ID
+});
+
+app.use(cors());
+// view engine setup
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'jade');
+
+// uncomment after placing your favicon in /public
+//app.use(favicon(__dirname + '/public/favicon.ico'));
+app.use(logger('dev'));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+
+app.use('/', routes);
+app.use('/users', users);
+app.use('/secured', authenticate);
+
+
+app.get('/ping', function(req, res) {
+  res.send("All good. You don't need to be authenticated to call this");
+});
+
+
+app.get('/secured/ping', function(req, res) {
+  res.status(200).send("All good. You only get this message if you're authenticated");
+});
+
+var port = process.env.PORT || 3001;
+
+http.createServer(app).listen(port, function (err) {
+  console.log('listening in http://localhost:' + port);
+});
+
+module.exports = app;
+
+var appAngular = angular.module('sample', ['auth0', 'angular-storage', 'angular-jwt', 'ngRoute', 'sample.home']);
+appAngular.config( function myAppConfig ( $routeProvider, authProvider, $httpProvider, $locationProvider,
   jwtInterceptorProvider) {
   $routeProvider
     .when( '/', {
@@ -49,11 +110,11 @@ app.config( function myAppConfig ( $routeProvider, authProvider, $httpProvider, 
   // want to check the delegation-token example
   $httpProvider.interceptors.push('jwtInterceptor');
 });
-app.run(['auth', function(auth) {
+appAngular.run(['auth', function(auth) {
   // This hooks all auth events to check everything as soon as the app starts
   auth.hookEvents();
 }]);
-app.run(function($rootScope, auth, store, jwtHelper, $location) {
+appAngular.run(function($rootScope, auth, store, jwtHelper, $location) {
   $rootScope.$on('$locationChangeStart', function() {
 
     var token = store.get('token');
@@ -70,7 +131,7 @@ app.run(function($rootScope, auth, store, jwtHelper, $location) {
     }
   });
 });
-app.controller( 'AppCtrl', function AppCtrl ( $scope, $location ) {
+appAngular.controller( 'AppCtrl', function AppCtrl ( $scope, $location ) {
   $scope.$on('$routeChangeSuccess', function(e, nextRoute){
     if ( nextRoute.$$route && angular.isDefined( nextRoute.$$route.pageTitle ) ) {
       $scope.pageTitle = nextRoute.$$route.pageTitle + ' | Auth0 Sample' ;
